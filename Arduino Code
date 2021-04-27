@@ -1,0 +1,501 @@
+#include <LiquidCrystal.h>
+#include <EEPROM.h>
+#include <Wire.h>
+#include "RTClib.h"
+
+RTC_DS3231 rtc;
+
+#define SOUND 9
+#define LED 13
+#define BUTTON A0
+
+int relayPin = 8;
+int relayStatus = 0;
+int off = 0;
+
+const int rs = 2, en = 3, d4 = 4, d5 = 5, d6 = 6, d7 = 7;
+
+const int timeButton = A1, nextButton = A2, setButton = A3;
+
+int mins = 0;
+int hors = 0;
+int secs = 0;
+
+int Hors = 0;
+int Mins = 0;
+int Secs = 0;
+
+LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
+
+void setup() {
+  // put your setup code here, to run once:
+
+  pinMode(LED, OUTPUT);
+  pinMode(BUTTON, INPUT_PULLUP);
+  pinMode(relayPin, OUTPUT);
+  pinMode(timeButton, INPUT_PULLUP);
+  pinMode(nextButton, INPUT_PULLUP);
+  pinMode(setButton, INPUT_PULLUP);
+
+  lcd.begin(16, 2);
+
+  lcd.setCursor(0, 0);
+  lcd.print("Hello!");
+  lcd.setCursor(0, 1);
+  lcd.print("Starting up...");
+
+  delay(5000);
+
+  lcd.clear();
+
+  setupRTC();
+
+  SetAlarm();
+}
+
+void loop() {
+  // put your main code here, to run repeatedly:
+
+  displayTimeLCD();
+
+  if (digitalRead(BUTTON) == LOW){
+    delay(500);
+    relayStatus = 1;
+    activateRelay();
+  }
+
+  if (relayStatus == 1) {
+    if (digitalRead(BUTTON) == LOW) {
+      delay(500);
+      relayStatus = 0;
+      deactivateRelay();
+    }
+  }
+
+  compareTimeAlarm();
+}
+
+void setupRTC() {
+  
+  Serial.begin(57600);
+
+  DateTime now = rtc.now;
+  
+  #ifndef ESP8266
+    while (!Serial);
+  #endif
+
+  if (! rtc.begin()) {
+    Serial.println("Couldn't find RTC");
+    Serial.flush();
+    abort();
+  }
+
+  if(rtc.lostPower()) {
+        rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
+    }
+}
+
+void activateSound() {
+  digitalWrite(SOUND, LOW);
+  delay(5000); 
+  digitalWrite(SOUND, HIGH); 
+}
+
+void activateRelay() {
+  digitalWrite(relayPin, HIGH);
+  lcd.setCursor(0, 1);
+  lcd.print("Lamp On         ");
+
+}
+
+void deactivateRelay() {
+  digitalWrite(relayPin, LOW);
+  lcd.setCursor(0, 1);
+  lcd.print("Off             ");
+}
+
+void SetAlarm()                             
+{
+    
+    int sett = 0;
+    int count = 1;
+
+      lcd.clear();
+      lcd.setCursor(0, 0);
+      lcd.print("Set Alarm Time ");
+
+      delay(500);
+
+      sett ++;
+      count = 1;
+    
+
+    while (sett == 1) {
+      
+      while (count == 1) {
+
+      lcd.setCursor(0, 1);
+      lcd.print("Enter Hour: ");
+
+        if (digitalRead(timeButton) == LOW) {
+          delay(250);
+  
+          hors++;
+
+          if(hors < 10) {
+            lcd.setCursor(12, 1);
+            lcd.print("0");
+            lcd.print(hors);
+          }
+
+          if (hors >= 10) {
+            lcd.setCursor(12, 1);
+            lcd.print(hors);
+          }
+
+          if (hors > 23) {
+            hors = 0;
+
+            lcd.setCursor(12, 1);
+            lcd.print("0");
+            lcd.print(hors);
+          }
+        }
+
+        if (digitalRead(nextButton) == LOW) {
+          delay(250);
+          count++;
+        }
+      }
+
+      while (count == 2) {
+        
+      lcd.setCursor(0, 1);
+      lcd.print("Enter Minute: ");
+
+        if (digitalRead(timeButton) == LOW) {
+          delay(250);
+
+          mins++;
+
+          if (mins < 10) {
+            lcd.setCursor(14, 1);
+            lcd.print("0");
+            lcd.print(mins);
+          }
+          
+          if (mins >= 10) {
+            lcd.setCursor(14, 1);
+            lcd.print(mins);
+          }
+
+          if (mins > 59) {
+            mins = 0;
+
+            lcd.setCursor(14, 1);
+            lcd.print("0");
+            lcd.print(mins);
+          }
+        }
+
+        if (digitalRead(nextButton) == LOW) {
+          delay(250);
+          count++;
+        }
+      }
+
+      while (count == 3) {
+        
+      lcd.setCursor(0,1);
+      lcd.print("Enter Second: ");
+
+
+        if (digitalRead(timeButton) == LOW) {
+         delay(250);
+          
+          secs ++;
+
+          if (secs < 10) {
+            lcd.setCursor(14, 1);
+            lcd.print("0");
+            lcd.print(secs);
+          }
+
+          if (secs >= 10) {
+            lcd.setCursor(14, 1);
+            lcd.print(secs);
+          }
+
+          if (secs > 59) {
+            secs = 0;
+
+            lcd.setCursor(14, 1);
+            lcd.print("0");
+            lcd.print(secs);
+          }
+        }
+
+        if (digitalRead(nextButton) == LOW) {
+          delay(250);
+          count++;
+        }
+      }
+
+      while (count == 4) {
+
+        lcd.clear();
+
+        lcd.setCursor(0, 0);
+        lcd.print("Alarm set for: ");
+
+        if ((hors < 10) or (mins < 10) or (secs < 10)) {
+
+          if ((hors < 10) and (mins < 10) and (secs < 10)) {
+            
+            lcd.setCursor(0, 1);
+            lcd.print("0");
+            lcd.print(hors);
+            lcd.print(":");
+            lcd.print("0");
+            lcd.print(mins);
+            lcd.print(":");
+            lcd.print("0");
+            lcd.print(secs);
+          }
+
+          else {
+
+            if ((hors < 10) and (mins < 10)) {
+              
+              lcd.setCursor(0, 1);
+              lcd.print("0");
+              lcd.print(hors);
+              lcd.print(":");
+              lcd.print("0");
+              lcd.print(mins);
+              lcd.print(":");
+              lcd.print(secs);
+            }
+
+            if ((hors < 10) and (secs < 10)) {
+              
+              lcd.setCursor(0, 1);
+              lcd.print("0");
+              lcd.print(hors);
+              lcd.print(":");
+              lcd.print("0");
+              lcd.print(mins);
+              lcd.print(":");
+              lcd.print("0");
+              lcd.print(secs);
+            }
+
+            if ((secs < 10) and (mins < 10)) {
+              
+              lcd.setCursor(0, 1);
+              lcd.print(hors);
+              lcd.print(":");
+              lcd.print("0");
+              lcd.print(mins);
+              lcd.print(":");
+              lcd.print("0");
+              lcd.print(secs);
+            }
+
+            else {
+              
+              if (hors < 10) {
+                
+                lcd.setCursor(0, 1);
+                lcd.print("0");
+                lcd.print(hors);
+                lcd.print(":");
+                lcd.print(mins);
+                lcd.print(":");
+                lcd.print(secs);
+            }
+            
+              if (mins < 10) {
+                
+                lcd.setCursor(0, 1);
+                lcd.print(hors);
+                lcd.print(":");
+                lcd.print("0");
+                lcd.print(mins);
+                lcd.print(":");
+                lcd.print(secs);
+            }
+
+              if (secs < 10) {
+                
+                lcd.setCursor(0, 1);
+                lcd.print(hors);
+                lcd.print(":");
+                lcd.print(mins);
+                lcd.print(":");
+                lcd.print("0");
+                lcd.print(secs);
+              }
+            }
+          }
+      }
+
+      else {
+        lcd.setCursor(0, 1);
+        lcd.print(hors);
+        lcd.print(":");
+        lcd.print(mins);
+        lcd.print(":");
+        lcd.print(secs);
+      }
+
+          delay(1500);
+
+          lcd.clear();
+
+          count = 0;
+          
+          sett++;
+    }
+    }
+
+    displayAlarm();
+}
+
+void displayTimeLCD () {
+
+
+  DateTime now = rtc.now();
+
+  Hors = now.hour();
+  Mins = now.minute();
+  Secs = now.second();
+
+  lcd.setCursor(0,0);
+
+  lcd.print("Time:  ");
+  
+  if ((Hors < 10) or (Mins < 10) or (Secs < 10)) {
+
+          if ((Hors < 10) and (Mins < 10) and (Secs < 10)) {
+         
+            lcd.print("0");
+            lcd.print(Hors);
+            lcd.print(":");
+            lcd.print("0");
+            lcd.print(Mins);
+            lcd.print(":");
+            lcd.print("0");
+            lcd.print(Secs);
+          }
+
+          else {
+          
+          if ((Hors < 10) and (Mins < 10)) {
+             
+              lcd.print("0");
+              lcd.print(Hors);
+              lcd.print(":");
+              lcd.print("0");
+              lcd.print(Mins);
+              lcd.print(":");
+              lcd.print(Secs);
+            }
+
+            if ((Hors < 10) and (Secs < 10)) {
+              
+              
+              lcd.print("0");
+              lcd.print(Hors);
+              lcd.print(":");
+              lcd.print(Mins);
+              lcd.print(":");
+              lcd.print("0");
+              lcd.print(Secs);
+            }
+
+            if ((Secs < 10) and (Mins < 10)) {
+              
+              
+              lcd.print(Hors);
+              lcd.print(":");
+              lcd.print("0");
+              lcd.print(Mins);
+              lcd.print(":");
+              lcd.print("0");
+              lcd.print(Secs);
+            }
+
+            else {
+              
+              if (Hors < 10) {
+                             
+                lcd.print("0");
+                lcd.print(Hors);
+                lcd.print(":");
+                lcd.print(Mins);
+                lcd.print(":");
+                lcd.print(Secs);
+            }
+            
+              if (Mins < 10) {
+                
+                lcd.print(Hors);
+                lcd.print(":");
+                lcd.print("0");
+                lcd.print(Mins);
+                lcd.print(":");
+                lcd.print(Secs);
+            }
+
+              if (Secs < 10) {
+                
+                lcd.print(Hors);
+                lcd.print(":");
+                lcd.print(Mins);
+                lcd.print(":");
+                lcd.print("0");
+                lcd.print(Secs);
+              }
+            }
+          }
+      }
+
+      else {
+        
+        
+        lcd.print(Hors);
+        lcd.print(":");
+        lcd.print(Mins);
+        lcd.print(":");
+        lcd.print(Secs);
+      }
+      delay(1000);
+}
+
+void displayAlarm() {
+  lcd.setCursor(0, 1);
+  lcd.print("Alarm: ");
+  lcd.print(hors);
+  lcd.print(":");
+  lcd.print(mins);
+  lcd.print(":");
+  lcd.print(secs);
+  
+}
+
+void compareTimeAlarm() {
+
+  if ((hors == Hors) and (mins == Mins) and (secs == Secs)) {
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("ALARM SOUNDING!");
+    lcd.setCursor(0, 1);
+    lcd.print("WAKE UP!");
+    
+    activateSound();
+    activateRelay();
+  }
+  
+}
